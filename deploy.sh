@@ -11,3 +11,5 @@ rm -rf dist/
 bumpversion patch
 python setup.py sdist
 twine upload dist/*
+git push origin deploy
+git push origin deploy --tags
