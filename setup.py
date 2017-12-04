@@ -53,8 +53,10 @@ else:
     sphinxprogram = "sphinxcontrib-programoutput>0.8"
 
 setup(
-    name='androguard',
-    description='Androguard is a full python tool to play with Android files.',
+    name='ak-androguard',
+    description=(
+        'A fork of official Androguard project. '
+        'Androguard is a full python tool to play with Android files.'),
     version=__version__,
     packages=find_packages(),
     data_files=[(data_prefix,
@@ -76,7 +78,7 @@ setup(
         'magic': ['file-magic'],
         'docs': ['sphinx', sphinxprogram, 'sphinx_rtd_theme'],
         'graphing': ['pydot'],
-	'tests': ['mock>=2.0', 'nose', 'codecov', 'coverage'],
+        'tests': ['mock>=2.0', 'nose', 'codecov', 'coverage'],
     },
     setup_requires=['setuptools'],
 
