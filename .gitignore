@@ -26,6 +26,4 @@ dist/
 test_session
 
 .eggs/
-
-# Appknox Specific Ignore
-ak_androguard.egg-info/
+ak_androguard.egg-info
