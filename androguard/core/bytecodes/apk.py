@@ -508,9 +508,10 @@ class APK(object):
             yield self.get_file("classes.dex")
 
             # Multidex support
-            basename = "classes%d.dex"
-            for i in range(2, sys.maxsize):
-                yield self.get_file(basename % i)
+            dexre = re.compile("^classes(\d+).dex$")
+            for file in self.get_files():
+                if dexre.search(file):
+                    yield self.get_file(file)
         except FileNotPresent:
             pass
 
@@ -520,7 +521,10 @@ class APK(object):
 
         :return: True if multiple dex found, otherwise False
         """
-        return "classes1.dex" in self.get_files()
+        dexre = re.compile("^classes(\d+)?.dex$")
+        return len(
+            [instance for instance in self.get_files() if dexre.search(instance)]
+        ) > 1
 
     def get_elements(self, tag_name, attribute):
         """
@@ -1039,5 +1043,3 @@ def show_Certificate(cert, short=False):
         print("{}: {}".format(h.name, binascii.hexlify(cert.fingerprint(h())).decode("ascii")))
     print("Issuer: {}".format(get_certificate_name_string(cert.issuer, short=short)))
     print("Subject: {}".format(get_certificate_name_string(cert.subject, short=short)))
-
-
