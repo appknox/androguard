@@ -498,11 +498,12 @@ class TaintedVariables(object):
 
 class PathP(object):
 
-    def __init__(self, access, idx, src_idx, dst_idx):
+    def __init__(self, access, idx, src_idx, dst_idx, vm):
         self.access_flag = access
         self.idx = idx
         self.src_idx = src_idx
         self.dst_idx = dst_idx
+        self.vm = vm
 
     def get_access_flag(self):
         return self.access_flag
@@ -539,7 +540,7 @@ class TaintedPackage(object):
         return self.paths
 
     def push(self, access, idx, src_idx, dst_idx):
-        p = PathP(access, idx, src_idx, dst_idx)
+        p = PathP(access, idx, src_idx, dst_idx, self.vm)
         self.paths[access].append(p)
         return p
 
