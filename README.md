@@ -12,6 +12,10 @@ pip install -U androguard
 ```
 ... let's start reversing!
 
+## Installation
+
+    pip install ak_androguard
+
 ## Features
 
 Androguard is a full python tool to play with Android files.
@@ -29,7 +33,17 @@ Androguard + tools: Anthony Desnos (desnos at t0t0.fr).
 
 DAD (DAD is A Decompiler): Geoffroy Gueguen (geoffroy dot gueguen at gmail dot com)
 
-## Documentation
+## 2. Stable release
+
+See the stable release here:
+https://github.com/appknox/androguard/releases
+
+You can also install androguard from the Debian repositories: [androguard](http://packages.debian.org/androguard).
+
+Note that androguard only works with python >= 2.7 or >= 3.3!
+Androguard also supports PyPy2>=5.9.0.
+
+## 3. Documentation
 
 Find the documentation for master on [ReadTheDocs](http://androguard.readthedocs.io/en/latest/).
 
