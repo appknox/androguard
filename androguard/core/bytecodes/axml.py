@@ -1,9 +1,6 @@
 from __future__ import division
 from __future__ import print_function
 
-from future import standard_library
-
-standard_library.install_aliases()
 from builtins import chr
 from builtins import range
 from builtins import object
@@ -16,7 +13,6 @@ from xml.sax.saxutils import escape
 import collections
 from collections import defaultdict
 
-import lxml.sax
 from lxml import etree
 import logging
 
@@ -628,34 +624,6 @@ def long2int(l):
     return l
 
 
-def long2str(l):
-    """Convert an integer to a string."""
-    if type(l) not in (types.IntType, types.LongType):
-        raise ValueError('the input must be an integer')
-
-    if l < 0:
-        raise ValueError('the input must be greater than 0')
-    s = ''
-    while l:
-        s = s + chr(l & 255)
-        l >>= 8
-
-    return s
-
-
-def str2long(s):
-    """Convert a string to a long integer."""
-    if type(s) not in (types.StringType, types.UnicodeType):
-        raise ValueError('the input must be a string')
-
-    l = 0
-    for i in s:
-        l <<= 8
-        l |= ord(i)
-
-    return l
-
-
 def getPackage(i):
     if i >> 24 == 1:
         return "android:"
@@ -767,11 +735,19 @@ class AXMLPrinter(object):
         return self.buff.encode('utf-8')
 
     def get_xml(self):
-        parser = etree.XMLParser(recover=True, resolve_entities=False)
-        tree = etree.fromstring(self.get_buff(), parser=parser)
-        return etree.tostring(tree, encoding="utf-8", pretty_print=True)
+        """
+        Get the XML as an UTF-8 string
+
+        :return: str
+        """
+        return etree.tostring(self.get_xml_obj(), encoding="utf-8", pretty_print=True)
 
     def get_xml_obj(self):
+        """
+        Get the XML as an ElementTree object
+
+        :return: :class:`~lxml.etree.Element`
+        """
         parser = etree.XMLParser(recover=True, resolve_entities=False)
         tree = etree.fromstring(self.get_buff(), parser=parser)
         return tree
@@ -833,6 +809,61 @@ ACONFIGURATION_SCREEN_SIZE = 0x0200
 ACONFIGURATION_VERSION = 0x0400
 ACONFIGURATION_SCREEN_LAYOUT = 0x0800
 ACONFIGURATION_UI_MODE = 0x1000
+ACONFIGURATION_LAYOUTDIR_ANY = 0x00
+ACONFIGURATION_LAYOUTDIR_LTR = 0x01
+ACONFIGURATION_LAYOUTDIR_RTL = 0x02
+ACONFIGURATION_SCREENSIZE_ANY = 0x00
+ACONFIGURATION_SCREENSIZE_SMALL = 0x01
+ACONFIGURATION_SCREENSIZE_NORMAL = 0x02
+ACONFIGURATION_SCREENSIZE_LARGE = 0x03
+ACONFIGURATION_SCREENSIZE_XLARGE = 0x04
+ACONFIGURATION_SCREENLONG_ANY = 0x00
+ACONFIGURATION_SCREENLONG_NO = 0x1
+ACONFIGURATION_SCREENLONG_YES = 0x2
+ACONFIGURATION_TOUCHSCREEN_ANY = 0x0000
+ACONFIGURATION_TOUCHSCREEN_NOTOUCH = 0x0001
+ACONFIGURATION_TOUCHSCREEN_STYLUS = 0x0002
+ACONFIGURATION_TOUCHSCREEN_FINGER = 0x0003
+ACONFIGURATION_DENSITY_DEFAULT = 0
+ACONFIGURATION_DENSITY_LOW = 120
+ACONFIGURATION_DENSITY_MEDIUM = 160
+ACONFIGURATION_DENSITY_TV = 213
+ACONFIGURATION_DENSITY_HIGH = 240
+ACONFIGURATION_DENSITY_XHIGH = 320
+ACONFIGURATION_DENSITY_XXHIGH = 480
+ACONFIGURATION_DENSITY_XXXHIGH = 640
+ACONFIGURATION_DENSITY_ANY = 0xfffe
+ACONFIGURATION_DENSITY_NONE = 0xffff
+MASK_LAYOUTDIR = 0xC0
+MASK_SCREENSIZE = 0x0f
+MASK_SCREENLONG = 0x30
+SHIFT_LAYOUTDIR = 6
+SHIFT_SCREENLONG = 4
+LAYOUTDIR_ANY = ACONFIGURATION_LAYOUTDIR_ANY << SHIFT_LAYOUTDIR
+LAYOUTDIR_LTR = ACONFIGURATION_LAYOUTDIR_LTR << SHIFT_LAYOUTDIR
+LAYOUTDIR_RTL = ACONFIGURATION_LAYOUTDIR_RTL << SHIFT_LAYOUTDIR
+SCREENSIZE_ANY = ACONFIGURATION_SCREENSIZE_ANY
+SCREENSIZE_SMALL = ACONFIGURATION_SCREENSIZE_SMALL
+SCREENSIZE_NORMAL = ACONFIGURATION_SCREENSIZE_NORMAL
+SCREENSIZE_LARGE = ACONFIGURATION_SCREENSIZE_LARGE
+SCREENSIZE_XLARGE = ACONFIGURATION_SCREENSIZE_XLARGE
+SCREENLONG_ANY = ACONFIGURATION_SCREENLONG_ANY << SHIFT_SCREENLONG
+SCREENLONG_NO = ACONFIGURATION_SCREENLONG_NO << SHIFT_SCREENLONG
+SCREENLONG_YES = ACONFIGURATION_SCREENLONG_YES << SHIFT_SCREENLONG
+DENSITY_DEFAULT = ACONFIGURATION_DENSITY_DEFAULT
+DENSITY_LOW = ACONFIGURATION_DENSITY_LOW
+DENSITY_MEDIUM = ACONFIGURATION_DENSITY_MEDIUM
+DENSITY_TV = ACONFIGURATION_DENSITY_TV
+DENSITY_HIGH = ACONFIGURATION_DENSITY_HIGH
+DENSITY_XHIGH = ACONFIGURATION_DENSITY_XHIGH
+DENSITY_XXHIGH = ACONFIGURATION_DENSITY_XXHIGH
+DENSITY_XXXHIGH = ACONFIGURATION_DENSITY_XXXHIGH
+DENSITY_ANY = ACONFIGURATION_DENSITY_ANY
+DENSITY_NONE = ACONFIGURATION_DENSITY_NONE
+TOUCHSCREEN_ANY = ACONFIGURATION_TOUCHSCREEN_ANY
+TOUCHSCREEN_NOTOUCH = ACONFIGURATION_TOUCHSCREEN_NOTOUCH
+TOUCHSCREEN_STYLUS = ACONFIGURATION_TOUCHSCREEN_STYLUS
+TOUCHSCREEN_FINGER = ACONFIGURATION_TOUCHSCREEN_FINGER
 
 
 class ARSCParser(object):
@@ -879,18 +910,21 @@ class ARSCParser(object):
 
                 self.packages[package_name] = []
 
+                # After the Header, we have the resource type symbol table
                 self.buff.set_idx(current_package.header.start + current_package.typeStrings)
                 type_sp_header = ARSCHeader(self.buff)
                 assert type_sp_header.type == RES_STRING_POOL_TYPE, \
                     "Expected String Pool header, got %x" % type_sp_header.type
                 mTableStrings = StringBlock(self.buff, type_sp_header)
 
+                # Next, we should have the resource key symbol table
                 self.buff.set_idx(current_package.header.start + current_package.keyStrings)
                 key_sp_header = ARSCHeader(self.buff)
                 assert key_sp_header.type == RES_STRING_POOL_TYPE, \
                     "Expected String Pool header, got %x" % key_sp_header.type
                 mKeyStrings = StringBlock(self.buff, key_sp_header)
 
+                # Add them to the dict of read packages
                 self.packages[package_name].append(current_package)
                 self.packages[package_name].append(mTableStrings)
                 self.packages[package_name].append(mKeyStrings)
@@ -899,11 +933,15 @@ class ARSCParser(object):
                                     mTableStrings, mKeyStrings)
 
                 # skip to the first header in this table package chunk
-                self.buff.set_idx(res_header.start + res_header.header_size)
+                # FIXME is this correct? We have already read the first two sections!
+                # self.buff.set_idx(res_header.start + res_header.header_size)
+                # this looks more like we want: (???)
+                self.buff.set_idx(res_header.start + res_header.header_size + type_sp_header.size + key_sp_header.size)
 
+                # Read all other headers
                 while self.buff.get_idx() <= package_data_end - ARSCHeader.SIZE:
-
                     pkg_chunk_header = ARSCHeader(self.buff)
+                    log.debug("Found a header: {}".format(pkg_chunk_header))
                     if pkg_chunk_header.start + pkg_chunk_header.size > package_data_end:
                         # we are way off the package chunk; bail out
                         break
@@ -911,20 +949,19 @@ class ARSCParser(object):
                     self.packages[package_name].append(pkg_chunk_header)
 
                     if pkg_chunk_header.type == RES_TABLE_TYPE_SPEC_TYPE:
-                        self.packages[package_name].append(ARSCResTypeSpec(
-                            self.buff, pc))
+                        self.packages[package_name].append(ARSCResTypeSpec(self.buff, pc))
 
                     elif pkg_chunk_header.type == RES_TABLE_TYPE_TYPE:
                         a_res_type = ARSCResType(self.buff, pc)
                         self.packages[package_name].append(a_res_type)
-                        self.resource_configs[package_name][a_res_type].add(
-                            a_res_type.config)
+                        self.resource_configs[package_name][a_res_type].add(a_res_type.config)
+
+                        log.debug("Config: {}".format(a_res_type.config))
 
                         entries = []
                         for i in range(0, a_res_type.entryCount):
                             current_package.mResId = current_package.mResId & 0xffff0000 | i
-                            entries.append((unpack('<i', self.buff.read(4))[0],
-                                            current_package.mResId))
+                            entries.append((unpack('<i', self.buff.read(4))[0], current_package.mResId))
 
                         self.packages[package_name].append(entries)
 
@@ -935,6 +972,15 @@ class ARSCParser(object):
                             if entry != -1:
                                 ate = ARSCResTableEntry(self.buff, res_id, pc)
                                 self.packages[package_name].append(ate)
+                                if ate.is_weak():
+                                    # FIXME we are not sure how to implement the FLAG_WEAk!
+                                    # We saw the following: There is just a single Res_value after the ARSCResTableEntry
+                                    # and then comes the next ARSCHeader.
+                                    # Therefore we think this means all entries are somehow replicated?
+                                    # So we do some kind of hack here. We set the idx to the entry again...
+                                    # Now we will read all entries!
+                                    # Not sure if this is a good solution though
+                                    self.buff.set_idx(ate.start)
                     elif pkg_chunk_header.type == RES_TABLE_LIBRARY_TYPE:
                         log.warning("RES_TABLE_LIBRARY_TYPE chunk is not supported")
                     else:
@@ -1070,17 +1116,42 @@ class ARSCParser(object):
         return ["", ""]
 
     def get_packages_names(self):
+        """
+        Retrieve a list of all package names, which are available
+        in the given resources.arsc.
+        """
         return list(self.packages.keys())
 
     def get_locales(self, package_name):
+        """
+        Retrieve a list of all available locales in a given packagename.
+
+        :param package_name: the package name to get locales of
+        """
         self._analyse()
         return list(self.values[package_name].keys())
 
-    def get_types(self, package_name, locale):
+    def get_types(self, package_name, locale='\x00\x00'):
+        """
+        Retrieve a list of all types which are available in the given
+        package and locale.
+
+        :param package_name: the package name to get types of
+        :param locale: the locale to get types of (default: '\x00\x00')
+        """
         self._analyse()
         return list(self.values[package_name][locale].keys())
 
     def get_public_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'public'.
+
+        The public resources table contains the IDs for each item.
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
+
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1098,6 +1169,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_string_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'string'.
+
+        Read more about string resources:
+        https://developer.android.com/guide/topics/resources/string-resource.html
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1118,6 +1198,11 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_strings_resources(self):
+        """
+        Get the XML (as string) of all resources of type 'string'.
+        This is a combined variant, which has all locales and all package names
+        stored.
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1146,6 +1231,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_id_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'id'.
+
+        Read more about ID resources:
+        https://developer.android.com/guide/topics/resources/more-resources.html#Id
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1166,6 +1260,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_bool_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'bool'.
+
+        Read more about bool resources:
+        https://developer.android.com/guide/topics/resources/more-resources.html#Bool
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1182,6 +1285,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_integer_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'integer'.
+
+        Read more about integer resources:
+        https://developer.android.com/guide/topics/resources/more-resources.html#Integer
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1198,6 +1310,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_color_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'color'.
+
+        Read more about color resources:
+        https://developer.android.com/guide/topics/resources/more-resources.html#Color
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1214,6 +1335,15 @@ class ARSCParser(object):
         return buff.encode('utf-8')
 
     def get_dimen_resources(self, package_name, locale='\x00\x00'):
+        """
+        Get the XML (as string) of all resources of type 'dimen'.
+
+        Read more about Dimension resources:
+        https://developer.android.com/guide/topics/resources/more-resources.html#Dimension
+
+        :param package_name: the package name to get the resources for
+        :param locale: the locale to get the resources for (default: '\x00\x00')
+        """
         self._analyse()
 
         buff = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -1317,23 +1447,48 @@ class ARSCParser(object):
         self._resolved_strings = r
         return r
 
-    def get_res_configs(self, rid, config=None):
+    def get_res_configs(self, rid, config=None, fallback=True):
+        """
+        Return the resources found with the ID `rid` and select
+        the right one based on the configuration, or return all if no configuration was set.
+
+        But we try to be generous here and at least try to resolve something:
+        This method uses a fallback to return at least one resource (the first one in the list)
+        if more than one items are found and the default config is used and no default entry could be found.
+
+        This is usually a bad sign (i.e. the developer did not follow the android documentation:
+        https://developer.android.com/guide/topics/resources/localization.html#failing2)
+        In practise an app might just be designed to run on a single locale and thus only has those locales set.
+
+        You can disable this fallback behaviour, to just return exactly the given result.
+
+        :param rid: resource id as int
+        :param config: a config to resolve from, or None to get all results
+        :param fallback: Enable the fallback for resolving default configuration (default: True)
+        :return: a list of ARSCResTableConfig: ARSCResTableEntry
+        """
         self._analyse()
 
         if not rid:
             raise ValueError("'rid' should be set")
+        if not isinstance(rid, int):
+            raise ValueError("'rid' must be an int")
 
-        try:
-            res_options = self.resource_values[rid]
-            if len(res_options) > 1 and config:
-                return [(
-                    config,
-                    res_options[config])]
-            else:
-                return list(res_options.items())
-
-        except KeyError:
+        if rid not in self.resource_values:
+            log.info("The requested rid could not be found in the resources.")
             return []
+
+        res_options = self.resource_values[rid]
+        if len(res_options) > 1 and config:
+            if config in res_options:
+                return [(config, res_options[config])]
+            elif fallback and config == ARSCResTableConfig.default_config():
+                log.warning("No default resource config could be found for the given rid, using fallback!")
+                return [list(self.resource_values[rid].items())[0]]
+            else:
+                return []
+        else:
+            return list(res_options.items())
 
     def get_string(self, package_name, name, locale='\x00\x00'):
         self._analyse()
@@ -1394,6 +1549,9 @@ class ARSCHeader(object):
         self.type = unpack('<h', buff.read(2))[0]
         self.header_size = unpack('<h', buff.read(2))[0]
         self.size = unpack('<I', buff.read(4))[0]
+
+    def __repr__(self):
+        return "<ARSCHeader idx='0x{:08x}' type='{}' header_size='{}' size='{}'>".format(self.start, self.type, self.header_size, self.size)
 
 
 class ARSCResTablePackage(object):
@@ -1469,29 +1627,81 @@ class ARSCResTableConfig(object):
         return cls.DEFAULT
 
     def __init__(self, buff=None, **kwargs):
+        """
+        ARSCResTableConfig contains the configuration for specific resource selection.
+        This is used on the device to determine which resources should be loaded
+        based on different properties of the device like locale or displaysize.
+
+        See the definiton of ResTable_config in
+        platform_frameworks_base/libs/androidfw/include/androidfw/ResourceTypes.h
+
+
+        :param buff:
+        :param kwargs:
+        """
         if buff is not None:
             self.start = buff.get_idx()
+
+            # uint32_t
             self.size = unpack('<I', buff.read(4))[0]
+
+            # union: uint16_t mcc, uint16_t mnc
+            # 0 means any
             self.imsi = unpack('<I', buff.read(4))[0]
+
+            # uint32_t as chars \0\0 means any
+            # either two 7bit ASCII representing the ISO-639-1 language code
+            # or a single 16bit LE value representing ISO-639-2 3 letter code
             self.locale = unpack('<I', buff.read(4))[0]
+
+            # struct of:
+            # uint8_t orientation
+            # uint8_t touchscreen
+            # uint8_t density
             self.screenType = unpack('<I', buff.read(4))[0]
+
+            # struct of
+            # uint8_t keyboard
+            # uint8_t navigation
+            # uint8_t inputFlags
+            # uint8_t inputPad0
             self.input = unpack('<I', buff.read(4))[0]
+
+            # struct of
+            # uint16_t screenWidth
+            # uint16_t screenHeight
             self.screenSize = unpack('<I', buff.read(4))[0]
+
+            # struct of
+            # uint16_t sdkVersion
+            # uint16_t minorVersion  which should be always 0, as the meaning is not defined
             self.version = unpack('<I', buff.read(4))[0]
 
             self.screenConfig = 0
             self.screenSizeDp = 0
 
             if self.size >= 32:
+                # FIXME: is this really not always there?
+                # struct of
+                # uint8_t screenLayout
+                # uint8_t uiMode
+                # uint16_t smallestScreenWidthDp
                 self.screenConfig = unpack('<I', buff.read(4))[0]
 
                 if self.size >= 36:
+                    # FIXME is this really not always there?
+                    # struct of
+                    # uint16_t screenWidthDp
+                    # uint16_t screenHeightDp
                     self.screenSizeDp = unpack('<I', buff.read(4))[0]
 
             self.exceedingSize = self.size - 36
             if self.exceedingSize > 0:
                 log.debug("Skipping padding bytes!")
                 self.padding = buff.read(self.exceedingSize)
+
+        # TODO there is screenConfig2
+
         else:
             self.start = 0
             self.size = 0
@@ -1533,6 +1743,134 @@ class ARSCResTableConfig(object):
 
             self.exceedingSize = 0
 
+    def _unpack_language_or_region(self, char_in, char_base):
+        char_out = ""
+        if char_in[0] & 0x80:
+            first = char_in[1] & 0x1f
+            second = ((char_in[1] & 0xe0) >> 5) + ((char_in[0] & 0x03) << 3)
+            third = (char_in[0] & 0x7c) >> 2
+            char_out += chr(first + char_base)
+            char_out += chr(second + char_base)
+            char_out += chr(third + char_base)
+        else:
+            if char_in[0]:
+                char_out += chr(char_in[0])
+            if char_in[1]:
+                char_out += chr(char_in[1])
+        return char_out
+
+    def get_language_and_region(self):
+        if self.locale != 0:
+            _language = self._unpack_language_or_region([self.locale & 0xff,(self.locale & 0xff00)>>8,],ord('a'))
+            _region = self._unpack_language_or_region([(self.locale & 0xff0000)>>16,(self.locale & 0xff000000)>>24,],ord('0'))
+            return (_language + "-r" + _region) if _region else _language
+        return ""
+
+    def get_config_name_friendly(self):
+        res = []
+
+        mcc = self.imsi & 0xFFFF
+        mnc = (self.imsi & 0xFFFF0000) >> 16
+        if mcc != 0:
+            res.append("mcc%d"% mcc)
+        if mnc != 0:
+            res.append("mnc%d"% mnc)
+
+        if self.locale != 0:
+            res.append(self.get_language_and_region())
+
+
+        screenLayout = self.screenConfig  & 0xff
+        if (screenLayout&MASK_LAYOUTDIR) != 0:
+            if screenLayout&MASK_LAYOUTDIR == LAYOUTDIR_LTR:
+                res.append("ldltr")
+            elif screenLayout&MASK_LAYOUTDIR == LAYOUTDIR_RTL:
+                res.append("ldrtl")
+            else:
+                res.append("layoutDir_%d" % (screenLayout&MASK_LAYOUTDIR))
+
+        smallestScreenWidthDp = (self.screenConfig & 0xFFFF0000) >> 16
+        if smallestScreenWidthDp != 0:
+            res.append("sw%ddp"%smallestScreenWidthDp)
+
+        screenWidthDp = self.screenSizeDp & 0xFFFF
+        screenHeightDp = (self.screenSizeDp & 0xFFFF0000) >> 16
+        if screenWidthDp != 0:
+            res.append("w%ddp"%screenWidthDp)
+        if screenHeightDp != 0:
+            res.append("h%ddp"%screenHeightDp)
+
+
+        if (screenLayout&MASK_SCREENSIZE) != SCREENSIZE_ANY:
+            if screenLayout&MASK_SCREENSIZE == SCREENSIZE_SMALL:
+                res.append("small")
+            elif screenLayout&MASK_SCREENSIZE == SCREENSIZE_NORMAL:
+                res.append("normal")
+            elif screenLayout&MASK_SCREENSIZE == SCREENSIZE_LARGE:
+                res.append("large")
+            elif screenLayout&MASK_SCREENSIZE == SCREENSIZE_XLARGE:
+                res.append("xlarge")
+            else:
+                res.append("screenLayoutSize_%d"%(screenLayout&MASK_SCREENSIZE))
+        if (screenLayout&MASK_SCREENLONG) != 0:
+            if screenLayout&MASK_SCREENLONG == SCREENLONG_NO:
+                res.append("notlong")
+            elif screenLayout&MASK_SCREENLONG == SCREENLONG_YES:
+                res.append("long")
+            else:
+                res.append("screenLayoutLong_%d"%(screenLayout&MASK_SCREENLONG))
+
+
+        density = (self.screenType  & 0xffff0000) >> 16
+        if density != DENSITY_DEFAULT:
+            if density == DENSITY_LOW:
+                res.append("ldpi")
+            elif density == DENSITY_MEDIUM:
+                res.append("mdpi")
+            elif density == DENSITY_TV:
+                res.append("tvdpi")
+            elif density == DENSITY_HIGH:
+                res.append("hdpi")
+            elif density == DENSITY_XHIGH:
+                res.append("xhdpi")
+            elif density == DENSITY_XXHIGH:
+                res.append("xxhdpi")
+            elif density == DENSITY_XXXHIGH:
+                res.append("xxxhdpi")
+            elif density == DENSITY_NONE:
+                res.append("nodpi")
+            elif density == DENSITY_ANY:
+                res.append("anydpi")
+            else:
+                res.append("%ddpi"%(density))
+
+        touchscreen = (self.screenType  & 0xff00) >> 8
+        if touchscreen != TOUCHSCREEN_ANY:
+            if touchscreen == TOUCHSCREEN_NOTOUCH:
+                res.append("notouch")
+            elif touchscreen == TOUCHSCREEN_FINGER:
+                res.append("finger")
+            elif touchscreen == TOUCHSCREEN_STYLUS:
+                res.append("stylus")
+            else:
+                res.append("touchscreen_%d" % touchscreen)
+
+        screenSize = self.screenSize
+        if screenSize != 0:
+            screenWidth = self.screenSize  & 0xffff
+            screenHeight = (self.screenSize  & 0xffff0000) >> 16
+            res.append("%dx%d"%( screenWidth,screenHeight))
+
+        version = self.version
+        if version != 0:
+            sdkVersion = self.version  & 0xffff
+            minorVersion = (self.version  & 0xffff0000) >> 16
+            res.append("v%d"%sdkVersion)
+            if minorVersion != 0:
+                res.append(".%d"%minorVersion)
+
+        return "-".join(res)
+
     def get_language(self):
         x = self.locale & 0x0000ffff
         return chr(x & 0x00ff) + chr((x & 0xff00) >> 8)
@@ -1564,10 +1902,17 @@ class ARSCResTableConfig(object):
         return self._get_tuple() == other._get_tuple()
 
     def __repr__(self):
-        return repr(self._get_tuple())
+        return "<ARSCResTableConfig '{}'>".format(repr(self._get_tuple()))
 
 
 class ARSCResTableEntry(object):
+    """
+    See https://github.com/LineageOS/android_frameworks_base/blob/df2898d9ce306bb2fe922d3beaa34a9cf6873d27/include/androidfw/ResourceTypes.h#L1370
+    """
+    FLAG_COMPLEX = 1
+    FLAG_PUBLIC = 2
+    FLAG_WEAK = 4
+
     def __init__(self, buff, mResId, parent=None):
         self.start = buff.get_idx()
         self.mResId = mResId
@@ -1576,9 +1921,10 @@ class ARSCResTableEntry(object):
         self.flags = unpack('<H', buff.read(2))[0]
         self.index = unpack('<I', buff.read(4))[0]
 
-        if self.flags & 1:
+        if self.is_complex():
             self.item = ARSCComplex(buff, parent)
         else:
+            # If FLAG_COMPLEX is not set, a Res_value structure will follow
             self.key = ARSCResStringPoolRef(buff, self.parent)
 
     def get_index(self):
@@ -1591,13 +1937,16 @@ class ARSCResTableEntry(object):
         return self.key.get_data_value()
 
     def is_public(self):
-        return self.flags == 0 or self.flags == 2
+        return (self.flags & self.FLAG_PUBLIC) != 0
 
     def is_complex(self):
-        return (self.flags & 1) == 1
+        return (self.flags & self.FLAG_COMPLEX) != 0
+
+    def is_weak(self):
+        return (self.flags & self.FLAG_WEAK) != 0
 
     def __repr__(self):
-        return "ARSCResTableEntry(%x, %x, %x, %x, %x, %r)" % (
+        return "<ARSCResTableEntry idx='0x{:08x}' mResId='0x{:08x}' size='{}' flags='0x{:02x}' index='0x{:x}' holding={}>".format(
             self.start,
             self.mResId,
             self.size,
@@ -1620,7 +1969,7 @@ class ARSCComplex(object):
                                ARSCResStringPoolRef(buff, self.parent)))
 
     def __repr__(self):
-        return "ARSCComplex(%x, %d, %d)" % (self.start, self.id_parent, self.count)
+        return "<ARSCComplex idx='0x{:08x}' parent='{}' count='{}'>".format(self.start, self.id_parent, self.count)
 
 
 class ARSCResStringPoolRef(object):
@@ -1628,7 +1977,9 @@ class ARSCResStringPoolRef(object):
         self.start = buff.get_idx()
         self.parent = parent
 
-        self.skip_bytes = buff.read(3)
+        self.size, = unpack("<H", buff.read(2))
+        self.res0, = unpack("<B", buff.read(1))
+        assert self.res0 == 0, "res0 must be always zero!"
         self.data_type = unpack('<B', buff.read(1))[0]
         self.data = unpack('<I', buff.read(4))[0]
 
@@ -1655,13 +2006,20 @@ class ARSCResStringPoolRef(object):
         return self.data_type == TYPE_REFERENCE
 
     def __repr__(self):
-        return "ARSCResStringPoolRef(%x, %s, %x)" % (
+        return "<ARSCResStringPoolRef idx='0x{:08x}' size='{}' type='{}' data='0x{:08x}'>".format(
             self.start,
+            self.size,
             TYPE_TABLE.get(self.data_type, "0x%x" % self.data_type),
             self.data)
 
 
 def get_arsc_info(arscobj):
+    """
+    Return a string containing all resources packages ordered by packagename, locale and type.
+
+    :param arscobj: :class:`~ARSCParser`
+    :return: a string
+    """
     buff = ""
     for package in arscobj.get_packages_names():
         buff += package + ":\n"

@@ -56,6 +56,9 @@ class Session(object):
         self.analyzed_vms = collections.OrderedDict()
 
     def reset(self):
+        """
+        Reset the current session, delete all added files.
+        """
         self._setupObjects()
 
     def isOpen(self):
@@ -65,6 +68,20 @@ class Session(object):
         :return: `True` if any file was analyzed, `False` otherwise
         """
         return self.analyzed_digest != {}
+
+    def show(self):
+        """
+        Print information about the current session
+        """
+        print("APKs in Session: {}".format(len(self.analyzed_apk)))
+        for d, a in self.analyzed_apk.items():
+            print("\t{}: {}".format(d, a))
+        print("DEXs in Session: {}".format(len(self.analyzed_dex)))
+        for d, dex in self.analyzed_dex.items():
+            print("\t{}: {}".format(d, dex))
+        print("Analysis in Session: {}".format(len(self.analyzed_vms)))
+        for d, a in self.analyzed_vms.items():
+            print("\t{}: {}".format(d, a))
 
     def addAPK(self, filename, data):
         """
@@ -106,10 +123,6 @@ class Session(object):
         self.analyzed_files[filename].append(digest)
         self.analyzed_digest[digest] = filename
 
-        if self.export_ipython:
-            log.debug("Exporting in ipython")
-            d.create_python_export()
-
         if dx is None:
             dx = Analysis()
 
@@ -120,6 +133,10 @@ class Session(object):
             d.set_decompiler(DecompilerDAD(d, dx))
             d.set_vmanalysis(dx)
         self.analyzed_dex[digest] = dx
+
+        if self.export_ipython:
+            log.debug("Exporting in ipython")
+            d.create_python_export()
 
         return digest, d, dx
 

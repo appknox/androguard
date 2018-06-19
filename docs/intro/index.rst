@@ -6,3 +6,5 @@ Introduction
 
    installation.rst
    gettingstarted.rst
+   sessions.rst
+   use_jadx.rst
