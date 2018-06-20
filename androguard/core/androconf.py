@@ -4,6 +4,7 @@ import logging
 import tempfile
 
 from androguard import __version__
+from androguard.core.api_specific_resources import load_permission_mappings, load_permissions
 ANDROGUARD_VERSION = __version__
 
 log = logging.getLogger("androguard.default")
@@ -24,9 +25,9 @@ def is_ascii_problem(s):
     :return: True if string contains other chars than ASCII, False otherwise
     """
     try:
-        s.decode("ascii")
+        s.encode("ascii")
         return False
-    except UnicodeDecodeError:
+    except (UnicodeEncodeError, UnicodeDecodeError):
         return True
 
 
@@ -42,9 +43,8 @@ class Color(object):
     Grey = "\033[37m"
     Bold = "\033[1m"
 
-
 # TODO most of these options are duplicated, as they are also the default arguments to the functions
-CONF = {
+default_conf = {
     # Assume the binary is in $PATH, otherwise give full path
     "BIN_JADX": "jadx",
     "BIN_DED": "ded.sh",
@@ -91,19 +91,39 @@ CONF = {
     "PRINT_FCT": sys.stdout.write,
     "LAZY_ANALYSIS": False,
     "MAGIC_PATH_FILE": None,
-    "DEFAULT_API": 19,
+    "DEFAULT_API": 16,  # this is the minimal API version we have
     "SESSION": None,
 }
 
-if os.path.exists(os.path.join(os.path.dirname(__file__), '..', '..', 'androgui.py')):
-    CONF['data_prefix'] = os.path.join(os.path.dirname(__file__), '..', 'gui')
-# workaround issue on OSX, where sys.prefix is not an installable location
-elif sys.platform == 'darwin' and sys.prefix.startswith('/System'):
-    CONF['data_prefix'] = os.path.join('.', 'share', 'androguard')
-elif sys.platform == 'win32':
-    CONF['data_prefix'] = os.path.join(sys.prefix, 'Scripts', 'androguard')
-else:
-    CONF['data_prefix'] = os.path.join(sys.prefix, 'share', 'androguard')
+
+class Configuration:
+    instance = None
+
+    def __init__(self):
+        """
+        A Wrapper for the CONF object
+        This creates a singleton, which has the same attributes everywhere.
+        """
+        if not Configuration.instance:
+            Configuration.instance = default_conf
+
+    def __getattr__(self, item):
+        return getattr(self.instance, item)
+
+    def __getitem__(self, item):
+        return self.instance[item]
+
+    def __setitem__(self, key, value):
+        self.instance[key] = value
+
+    def __str__(self):
+        return str(self.instance)
+
+    def __repr__(self):
+        return repr(self.instance)
+
+
+CONF = Configuration()
 
 
 def default_colors(obj):
@@ -312,22 +332,25 @@ def color_range(startcolor, goalcolor, steps):
     return interpolate_tuple(start_tuple, goal_tuple, steps)
 
 
-def load_api_specific_resource_module(resource_name, api):
-    # Those two imports are quite slow.
-    # Therefor we put them directly into this method
-    from androguard.core.api_specific_resources.aosp_permissions.aosp_permissions import AOSP_PERMISSIONS
-    from androguard.core.api_specific_resources.api_permission_mappings.api_permission_mappings import AOSP_PERMISSIONS_MAPPINGS
+def load_api_specific_resource_module(resource_name, api=None):
+    """
+    Load the module from the JSON files and return a dict, which might be empty
+    if the resource could not be loaded.
 
-    if resource_name == "aosp_permissions":
-        mod = AOSP_PERMISSIONS
-    elif resource_name == "api_permission_mappings":
-        mod = AOSP_PERMISSIONS_MAPPINGS
-    else:
-        raise InvalidResourceError("Invalid Resource {}".format(resource_name))
+    If no api version is given, the default one from the CONF dict is used.
+
+    :param resource_name: Name of the resource to load
+    :param api: API version
+    :return: dict
+    """
+    loader = dict(aosp_permissions=load_permissions,
+                  api_permission_mappings=load_permission_mappings)
+
+    if resource_name not in loader:
+        raise InvalidResourceError("Invalid Resource '{}', not in [{}]".format(resource_name, ", ".join(loader.keys())))
 
     if not api:
         api = CONF["DEFAULT_API"]
-    value = mod.get(api)
-    if value:
-        return value
-    return mod.get('9')
+
+    return loader[resource_name](api)
+
